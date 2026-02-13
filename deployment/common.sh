@@ -21,14 +21,14 @@ VAST_RAG_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Python virtual environment path
 VENV_PATH="${VAST_RAG_ROOT}/.venv"
 
-# Claude configuration directory
-CLAUDE_CONFIG="${HOME}/.claude"
+# Claude configuration file path
+CLAUDE_CONFIG="${HOME}/Library/Application Support/Claude/claude_desktop_config.json"
 
-# RAG documentation path
-RAG_DOCS_PATH="${VAST_RAG_ROOT}/docs"
+# RAG documentation path (can be overridden via environment variable)
+RAG_DOCS_PATH="${RAG_DOCS_PATH:-$HOME/projects/RAG}"
 
 # RAG data storage path
-RAG_DATA_PATH="${HOME}/.vast-rag/data"
+RAG_DATA_PATH="${HOME}/.claude/rag-data"
 
 # Export paths for use in subshells
 export VAST_RAG_ROOT VENV_PATH CLAUDE_CONFIG RAG_DOCS_PATH RAG_DATA_PATH
@@ -83,10 +83,11 @@ log_warn() {
     echo -e "${COLOR_YELLOW}[WARN]${COLOR_RESET} $*" >&2
 }
 
-# log_error: Print error message
+# log_error: Print error message and exit
 # Usage: log_error "message"
 log_error() {
     echo -e "${COLOR_RED}[ERROR]${COLOR_RESET} $*" >&2
+    exit 1
 }
 
 # ============================================================================
@@ -122,6 +123,7 @@ backup_file() {
 
     if cp "$file" "$backup"; then
         log_info "Backed up: $file -> $backup"
+        echo "$backup"
         return 0
     else
         log_error "Failed to backup: $file"
@@ -160,7 +162,7 @@ validate_json() {
         return 1
     fi
 
-    if python3 -c "import json; json.load(open('$json_file'))" 2>/dev/null; then
+    if python3 -c "import sys, json; json.load(open(sys.argv[1]))" "$json_file" 2>/dev/null; then
         return 0
     else
         log_error "Invalid JSON in file: $json_file"
@@ -189,9 +191,6 @@ ensure_dir() {
 # ============================================================================
 # INITIALIZATION
 # ============================================================================
-
-# Ensure critical directories exist
-ensure_dir "$RAG_DATA_PATH"
 
 # Log that common utilities have been loaded
 log_info "Common utilities loaded from: ${BASH_SOURCE[0]}"
