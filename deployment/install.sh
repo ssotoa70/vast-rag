@@ -45,6 +45,9 @@ if [[ "$ROLLBACK" == true ]]; then
 
     # Find latest backup
     LATEST_BACKUP=$(get_latest_backup "$CLAUDE_CONFIG")
+    if [[ -z "$LATEST_BACKUP" ]]; then
+        log_error "No backup found. Cannot rollback."
+    fi
 
     log_info "Restoring from backup: $LATEST_BACKUP"
     cp "$LATEST_BACKUP" "$CLAUDE_CONFIG"
@@ -78,14 +81,9 @@ fi
 
 # Check jq is available
 if ! command -v jq &> /dev/null; then
-    log_info "jq not found, installing via Homebrew..."
-
-    if ! command -v brew &> /dev/null; then
-        log_error "Homebrew not found. Install from https://brew.sh, then re-run this script."
-    fi
-
+    log_error "jq is required but not installed. Install it with:
     brew install jq
-    log_success "jq installed ✓"
+Then re-run this script."
 fi
 
 # ============================================================================
@@ -97,7 +95,8 @@ log_info "Backing up Claude Desktop configuration..."
 BACKUP_FILE=$(backup_file "$CLAUDE_CONFIG")
 
 if [[ -z "$BACKUP_FILE" ]]; then
-    log_warn "Backup failed. Proceeding anyway (risky)..."
+    log_error "Failed to create backup. Cannot proceed safely.
+Use --force to override (not recommended)"
 fi
 
 # ============================================================================
@@ -123,6 +122,9 @@ MCP_ENTRY=$(cat <<EOF
 EOF
 )
 
+# Validate generated JSON
+echo "$MCP_ENTRY" | jq . >/dev/null 2>&1 || log_error "Generated invalid MCP entry JSON"
+
 # ============================================================================
 # UPDATE CONFIGURATION
 # ============================================================================
@@ -131,6 +133,7 @@ log_info "Updating Claude Desktop configuration..."
 
 # Create temporary file
 TMP_CONFIG=$(mktemp)
+trap 'rm -f "$TMP_CONFIG"' EXIT
 
 # Check if vast-rag already exists
 if jq -e '.mcpServers["vast-rag"]' "$CLAUDE_CONFIG" >/dev/null 2>&1; then
@@ -141,12 +144,12 @@ else
 
     # Check if mcpServers exists
     if ! jq -e '.mcpServers' "$CLAUDE_CONFIG" >/dev/null 2>&1; then
-        # Create mcpServers section
-        jq '. + {mcpServers: {}}' "$CLAUDE_CONFIG" > "$TMP_CONFIG.init"
-        mv "$TMP_CONFIG.init" "$CLAUDE_CONFIG"
+        # Create mcpServers section and add vast-rag in one operation (atomic)
+        jq '. + {mcpServers: {}}' "$CLAUDE_CONFIG" | \
+            jq --argjson entry "$MCP_ENTRY" '.mcpServers["vast-rag"] = $entry' > "$TMP_CONFIG"
+    else
+        jq --argjson entry "$MCP_ENTRY" '.mcpServers["vast-rag"] = $entry' "$CLAUDE_CONFIG" > "$TMP_CONFIG"
     fi
-
-    jq --argjson entry "$MCP_ENTRY" '.mcpServers["vast-rag"] = $entry' "$CLAUDE_CONFIG" > "$TMP_CONFIG"
 fi
 
 # Validate JSON
