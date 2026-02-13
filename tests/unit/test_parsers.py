@@ -2,9 +2,12 @@ from pathlib import Path
 import pytest
 from vast_rag.parsers.markdown import MarkdownParser
 from vast_rag.parsers.pdf import PDFParser
+from vast_rag.parsers.html import HTMLParser
+from vast_rag.parsers.docx import DOCXParser
 from vast_rag.types import ParsedDocument
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
+from docx import Document
 
 
 @pytest.fixture
@@ -95,3 +98,80 @@ def test_pdf_parser_page_mapping(sample_pdf):
     assert len(page_texts) == 2
     assert "Page 1 Title" in page_texts[0]
     assert "Page 2 Title" in page_texts[1]
+
+
+@pytest.fixture
+def sample_html(tmp_path):
+    """Create a sample HTML file."""
+    html_file = tmp_path / "sample.html"
+    content = """
+    <!DOCTYPE html>
+    <html>
+    <head><title>Test Document</title></head>
+    <body>
+        <h1>Main Heading</h1>
+        <p>This is a paragraph.</p>
+        <h2>Subheading</h2>
+        <p>More content here.</p>
+        <script>console.log('ignore this');</script>
+    </body>
+    </html>
+    """
+    html_file.write_text(content)
+    return html_file
+
+
+def test_html_parser_strips_tags(sample_html):
+    """Test HTML parsing removes tags but keeps text."""
+    parser = HTMLParser()
+    doc = parser.parse(sample_html)
+
+    assert doc.format == "html"
+    assert "Main Heading" in doc.text
+    assert "<h1>" not in doc.text
+    assert "<script>" not in doc.text
+    assert "console.log" not in doc.text  # Script removed
+
+
+def test_html_parser_extracts_headings(sample_html):
+    """Test that HTML headings are extracted."""
+    parser = HTMLParser()
+    doc = parser.parse(sample_html)
+
+    assert "Main Heading" in doc.sections
+    assert "Subheading" in doc.sections
+
+
+@pytest.fixture
+def sample_docx(tmp_path):
+    """Create a sample DOCX file."""
+    docx_file = tmp_path / "sample.docx"
+
+    doc = Document()
+    doc.add_heading("Main Title", level=1)
+    doc.add_paragraph("First paragraph content.")
+    doc.add_heading("Section 1", level=2)
+    doc.add_paragraph("Section 1 content.")
+
+    doc.save(str(docx_file))
+    return docx_file
+
+
+def test_docx_parser_extracts_text(sample_docx):
+    """Test DOCX parsing extracts all text."""
+    parser = DOCXParser()
+    doc = parser.parse(sample_docx)
+
+    assert doc.format == "docx"
+    assert "Main Title" in doc.text
+    assert "First paragraph content" in doc.text
+    assert "Section 1" in doc.text
+
+
+def test_docx_parser_preserves_headings(sample_docx):
+    """Test that DOCX headings are extracted."""
+    parser = DOCXParser()
+    doc = parser.parse(sample_docx)
+
+    assert "Main Title" in doc.sections
+    assert "Section 1" in doc.sections
