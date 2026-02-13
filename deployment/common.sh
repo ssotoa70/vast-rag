@@ -28,7 +28,7 @@ CLAUDE_CONFIG="${HOME}/Library/Application Support/Claude/claude_desktop_config.
 RAG_DOCS_PATH="${RAG_DOCS_PATH:-$HOME/projects/RAG}"
 
 # RAG data storage path
-RAG_DATA_PATH="${HOME}/.claude/rag-data"
+RAG_DATA_PATH="${RAG_DATA_PATH:-$HOME/.claude/rag-data}"
 
 # Export paths for use in subshells
 export VAST_RAG_ROOT VENV_PATH CLAUDE_CONFIG RAG_DOCS_PATH RAG_DATA_PATH
