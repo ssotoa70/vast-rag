@@ -4,6 +4,7 @@ from vast_rag.parsers.markdown import MarkdownParser
 from vast_rag.parsers.pdf import PDFParser
 from vast_rag.parsers.html import HTMLParser
 from vast_rag.parsers.docx import DOCXParser
+from vast_rag.parsers.factory import ParserFactory
 from vast_rag.types import ParsedDocument
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
@@ -175,3 +176,36 @@ def test_docx_parser_preserves_headings(sample_docx):
 
     assert "Main Title" in doc.sections
     assert "Section 1" in doc.sections
+
+
+def test_parser_factory_selects_correct_parser(sample_markdown, sample_pdf, sample_html):
+    """Test factory selects appropriate parser for each format."""
+    factory = ParserFactory()
+
+    md_parser = factory.get_parser(sample_markdown)
+    assert md_parser.__class__.__name__ == "MarkdownParser"
+
+    pdf_parser = factory.get_parser(sample_pdf)
+    assert pdf_parser.__class__.__name__ == "PDFParser"
+
+    html_parser = factory.get_parser(sample_html)
+    assert html_parser.__class__.__name__ == "HTMLParser"
+
+
+def test_parser_factory_raises_for_unsupported(tmp_path):
+    """Test factory raises error for unsupported formats."""
+    factory = ParserFactory()
+    unsupported = tmp_path / "file.exe"
+    unsupported.write_bytes(b"binary data")
+
+    with pytest.raises(ValueError, match="No parser available"):
+        factory.get_parser(unsupported)
+
+
+def test_parser_factory_parse_document(sample_markdown):
+    """Test factory can parse documents directly."""
+    factory = ParserFactory()
+    doc = factory.parse_document(sample_markdown)
+
+    assert doc.format == "markdown"
+    assert "Main Title" in doc.text
