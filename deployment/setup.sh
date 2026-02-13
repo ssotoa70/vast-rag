@@ -84,13 +84,13 @@ log_info "Installing/upgrading dependencies..."
 python -m pip install --upgrade pip --quiet
 
 # Install project dependencies
-cd "$VAST_RAG_ROOT"
-if [[ -f "pyproject.toml" ]]; then
-    python -m pip install -e "." --quiet
-    log_success "Dependencies installed ✓"
-else
+if [[ ! -f "$VAST_RAG_ROOT/pyproject.toml" ]]; then
     log_error "pyproject.toml not found in $VAST_RAG_ROOT"
 fi
+
+cd "$VAST_RAG_ROOT"
+python -m pip install -e "." --quiet
+log_success "Dependencies installed ✓"
 
 # ============================================================================
 # EMBEDDING MODEL
@@ -139,11 +139,22 @@ ENV_FILE="$VAST_RAG_ROOT/.env"
 if [[ -f "$ENV_FILE" ]]; then
     log_info ".env already exists, skipping generation"
 else
+    if [[ ! -f "$SCRIPT_DIR/templates/.env.template" ]]; then
+        log_error "Template file not found: $SCRIPT_DIR/templates/.env.template"
+    fi
+
     cp "$SCRIPT_DIR/templates/.env.template" "$ENV_FILE"
 
-    # Replace placeholders with actual paths
-    sed -i '' "s|RAG_DOCS_PATH=.*|RAG_DOCS_PATH=$RAG_DOCS_PATH|" "$ENV_FILE"
-    sed -i '' "s|RAG_DATA_PATH=.*|RAG_DATA_PATH=$RAG_DATA_PATH|" "$ENV_FILE"
+    # Replace placeholders with actual paths (platform-specific sed syntax)
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS requires empty string after -i
+        sed -i '' "s|RAG_DOCS_PATH=.*|RAG_DOCS_PATH=$RAG_DOCS_PATH|" "$ENV_FILE"
+        sed -i '' "s|RAG_DATA_PATH=.*|RAG_DATA_PATH=$RAG_DATA_PATH|" "$ENV_FILE"
+    else
+        # Linux doesn't use empty string after -i
+        sed -i "s|RAG_DOCS_PATH=.*|RAG_DOCS_PATH=$RAG_DOCS_PATH|" "$ENV_FILE"
+        sed -i "s|RAG_DATA_PATH=.*|RAG_DATA_PATH=$RAG_DATA_PATH|" "$ENV_FILE"
+    fi
 
     log_success "Generated .env from template ✓"
 fi
