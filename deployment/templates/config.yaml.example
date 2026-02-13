@@ -1,0 +1,77 @@
+# VAST RAG Advanced Configuration
+# This file provides fine-grained control over RAG behavior
+# Copy to config.yaml and customize as needed
+
+chunking:
+  # Chunking strategy: 'semantic' or 'fixed'
+  strategy: semantic
+
+  # Chunk size in characters (for fixed strategy)
+  size: 1000
+
+  # Overlap between chunks in characters
+  overlap: 200
+
+  # Preserve code block boundaries when chunking
+  preserve_code_blocks: true
+
+embedding:
+  # Model name from sentence-transformers
+  # Popular options:
+  #   - all-MiniLM-L6-v2 (fast, 384 dimensions)
+  #   - all-mpnet-base-v2 (balanced, 768 dimensions)
+  #   - multi-qa-mpnet-base-dot-v1 (QA optimized, 768 dimensions)
+  model: all-MiniLM-L6-v2
+
+  # Embedding dimension (must match model)
+  dimension: 384
+
+  # Batch size for embedding generation
+  batch_size: 32
+
+  # Device: 'cuda', 'mps', or 'cpu'
+  device: cpu
+
+storage:
+  # ChromaDB persistent directory (relative to RAG_DATA_PATH)
+  chroma_path: chroma_db
+
+  # Cache size for query results (number of queries)
+  cache_size: 100
+
+  # Query cache TTL in seconds
+  query_cache_ttl: 3600
+
+file_watcher:
+  # Debounce interval in seconds
+  debounce: 2
+
+  # File extensions to watch (empty = all text files)
+  extensions:
+    - .md
+    - .txt
+    - .py
+    - .js
+    - .ts
+    - .java
+    - .cpp
+    - .h
+    - .rs
+    - .go
+    - .rb
+    - .php
+    - .swift
+    - .kt
+    - .scala
+
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: INFO
+
+  # Log file path (relative to RAG_DATA_PATH, empty = stdout only)
+  file: vast-rag.log
+
+  # Log rotation settings
+  rotation:
+    max_bytes: 10485760  # 10MB
+    backup_count: 5
