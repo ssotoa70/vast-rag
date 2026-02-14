@@ -414,6 +414,12 @@ log_info "Data Path:         $RAG_DATA_PATH"
 log_info "Log File:          $VERIFY_LOG"
 log_info ""
 
+log_success "Verification complete!"
+log_info "Next steps:"
+log_info "  1. Restart Claude Desktop to activate MCP server"
+log_info "  2. Add documents to: $RAG_DOCS_PATH"
+log_info "  3. Ask Claude: 'Search vast-rag docs for <topic>'"
+
 # Final status
 if [[ $FAILED_CHECKS -eq 0 ]]; then
     if [[ $SKIPPED_CHECKS -eq 0 ]]; then
