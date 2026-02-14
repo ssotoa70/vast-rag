@@ -4,129 +4,132 @@ Automated deployment and configuration scripts for the VAST RAG MCP server.
 
 ## Quick Start
 
-The deployment process consists of several scripts that should be run in order:
+```bash
+cd /Users/sergio.soto/Development/vast-rag
+./deployment/deploy.sh
+```
 
-1. **`setup_environment.sh`** - Set up Python virtual environment and install dependencies
-2. **`configure_mcp.sh`** - Configure Claude Desktop to use the VAST RAG MCP server
-3. **`index_documentation.sh`** - Index VAST documentation for RAG retrieval
-4. **`validate_deployment.sh`** - Validate the complete deployment
-5. **`rollback.sh`** - Rollback to previous configuration if needed
+This runs setup, install, and verify in sequence.
 
-## Prerequisites
-
-- macOS (tested on Darwin 25.2.0)
-- Python 3.11+
-- Claude Desktop installed
-- Git (for version control)
-
-## Usage
+## Detailed Usage
 
 ### Full Deployment
 
-Run all deployment steps in sequence:
-
 ```bash
-cd deployment
-./setup_environment.sh
-./configure_mcp.sh
-./index_documentation.sh
-./validate_deployment.sh
+cd /Users/sergio.soto/Development/vast-rag
+./deployment/deploy.sh
 ```
+
+This runs:
+1. `setup.sh` - Validates environment, installs dependencies
+2. `install.sh` - Registers MCP server in Claude Desktop
+3. `verify.sh` - Runs health checks
 
 ### Individual Scripts
 
-Each script can be run independently if needed:
-
+**Setup only:**
 ```bash
-# Set up Python environment only
-./setup_environment.sh
-
-# Reconfigure MCP settings only
-./configure_mcp.sh
-
-# Re-index documentation only
-./index_documentation.sh
-
-# Validate current deployment
-./validate_deployment.sh
+./deployment/setup.sh
 ```
 
-### Rollback
-
-If something goes wrong, use the rollback script:
-
+**Install MCP server:**
 ```bash
-./rollback.sh
+./deployment/install.sh
 ```
 
-This will restore the previous Claude Desktop configuration from the most recent backup.
+**Dry-run install (preview changes):**
+```bash
+./deployment/install.sh --dry-run
+```
+
+**Verify installation:**
+```bash
+./deployment/verify.sh
+```
+
+**Uninstall:**
+```bash
+./deployment/uninstall.sh
+```
+
+**Rollback installation:**
+```bash
+./deployment/install.sh --rollback
+```
 
 ## Directory Structure
 
 ```
 deployment/
 ├── README.md                 # This file
-├── .gitignore               # Git ignore rules
-├── common.sh                # Shared utilities and configuration
-├── templates/               # Configuration templates
-├── setup_environment.sh     # Environment setup script
-├── configure_mcp.sh         # MCP configuration script
-├── index_documentation.sh   # Documentation indexing script
-├── validate_deployment.sh   # Deployment validation script
-└── rollback.sh              # Configuration rollback script
+├── common.sh                 # Shared utilities and configuration
+├── templates/                # Configuration templates
+│   ├── config.yaml.example   # RAG configuration template
+│   └── mcp-entry.json        # MCP server entry template
+├── deploy.sh                 # Full deployment orchestrator
+├── setup.sh                  # Environment setup script
+├── install.sh                # MCP server installation script
+├── verify.sh                 # Health check and verification script
+└── uninstall.sh              # Clean removal script
 ```
 
 ## Common Utilities
 
 All scripts source `common.sh`, which provides:
 
-- **Path variables**: `VAST_RAG_ROOT`, `VENV_PATH`, `CLAUDE_CONFIG`, etc.
+- **Path variables**: `VAST_RAG_ROOT`, `VENV_PATH`, `CLAUDE_CONFIG`, `RAG_DOCS_PATH`, `RAG_DATA_PATH`
 - **Logging functions**: `log_info()`, `log_success()`, `log_warn()`, `log_error()`
-- **Utility functions**: `check_command()`, `backup_file()`, `validate_json()`, etc.
+- **Utility functions**: `check_command()`, `backup_file()`, `get_latest_backup()`, `validate_json()`, `ensure_dir()`
 - **Color-coded terminal output** (automatically disabled for non-TTY)
-
-## Configuration
-
-The scripts use the following default paths:
-
-- **Project root**: `/Users/sergio.soto/Development/vast-rag`
-- **Virtual environment**: `{project_root}/.venv`
-- **Claude config**: `~/.claude`
-- **RAG documentation**: `{project_root}/docs`
-- **RAG data**: `~/.vast-rag/data`
-
-These can be customized by editing `common.sh`.
-
-## Logs and Backups
-
-- Configuration backups are created automatically with timestamps
-- Backup files use the pattern: `{filename}.backup.{YYYYMMDD_HHMMSS}`
-- Log files are ignored by Git (see `.gitignore`)
 
 ## Troubleshooting
 
-If a script fails:
+### Setup fails: "Document directory not found"
 
-1. Check the error message for specific issues
-2. Verify prerequisites are installed
-3. Review the script's log output
-4. Use `rollback.sh` to restore previous configuration
-5. Re-run the failed script after fixing issues
+Create the documents directory:
+```bash
+mkdir -p ~/projects/RAG/vast-data
+# Add your VAST Data documentation
+```
 
-## Development
+### Install fails: "jq not found"
 
-When adding new deployment scripts:
+Install Homebrew and jq:
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+brew install jq
+```
 
-1. Source `common.sh` at the beginning
-2. Use the provided logging functions
-3. Create backups before modifying files
-4. Validate all changes before applying
-5. Update this README with script documentation
+### Verify fails: "Cannot import vast_rag"
 
-## Support
+This is expected if implementation is incomplete. Run verify again when the implementation session finishes.
 
-For issues or questions:
+### MCP server doesn't appear in Claude Desktop
 
-- Check the main project README
-- Review script comments for detailed behavior
-- Examine log output for error details
+1. Check config: `jq '.mcpServers["vast-rag"]' ~/Library/Application\ Support/Claude/claude_desktop_config.json`
+2. Restart Claude Desktop completely
+3. Check Developer Tools → Console for errors
+
+## Logs
+
+- **Verification**: `~/.claude/rag-data/logs/verify.log`
+- **MCP Server**: Check Claude Desktop Developer Tools
+
+## Configuration
+
+### Environment Variables
+
+Override defaults by setting environment variables before running scripts:
+
+```bash
+RAG_DOCS_PATH=/Users/sergio.soto/projects/RAG
+RAG_DATA_PATH=/Users/sergio.soto/.claude/rag-data
+```
+
+### Advanced Configuration (config.yaml)
+
+Copy template and customize:
+```bash
+cp deployment/templates/config.yaml.example config.yaml
+# Edit config.yaml
+```
