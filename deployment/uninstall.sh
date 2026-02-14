@@ -63,15 +63,20 @@ if [[ "$REMOVE_MCP" == true ]]; then
             # Remove vast-rag entry
             jq 'del(.mcpServers["vast-rag"])' "$CLAUDE_CONFIG" > "$TMP_CONFIG"
 
-            # Validate the new JSON
-            validate_json "$TMP_CONFIG"
+            # Validate the new JSON (run in subshell to contain log_error's exit 1)
+            if ! (validate_json "$TMP_CONFIG") 2>/dev/null; then
+                log_warn "JSON validation failed for modified config. Aborting MCP removal."
+                log_warn "Original config is unchanged."
+                rm -f "$TMP_CONFIG"
+            else
+                # Replace original config with modified version
+                mv "$TMP_CONFIG" "$CLAUDE_CONFIG"
+                trap - EXIT
 
-            # Replace original config with modified version
-            mv "$TMP_CONFIG" "$CLAUDE_CONFIG"
-
-            log_success "vast-rag removed from Claude Desktop configuration."
-            if [[ -n "${BACKUP_FILE:-}" ]]; then
-                log_info "Backup saved at: $BACKUP_FILE"
+                log_success "vast-rag removed from Claude Desktop configuration."
+                if [[ -n "${BACKUP_FILE:-}" ]]; then
+                    log_info "Backup saved at: $BACKUP_FILE"
+                fi
             fi
         fi
     fi
@@ -81,6 +86,8 @@ if [[ "$REMOVE_MCP" == true ]]; then
         rm -f "$VAST_RAG_ROOT/.mcp.json.example"
         log_info "Removed .mcp.json.example"
     fi
+else
+    log_info "Skipping MCP registration removal"
 fi
 
 # ============================================================================
@@ -96,6 +103,8 @@ if [[ "$DELETE_DATA" == true ]]; then
     else
         log_warn "Data directory not found: $RAG_DATA_PATH (already removed)"
     fi
+else
+    log_info "Preserving indexed data at $RAG_DATA_PATH"
 fi
 
 # ============================================================================
@@ -111,6 +120,8 @@ if [[ "$DELETE_VENV" == true ]]; then
     else
         log_warn "Virtual environment not found: $VENV_PATH (already removed)"
     fi
+else
+    log_info "Preserving virtual environment at $VENV_PATH"
 fi
 
 # ============================================================================
