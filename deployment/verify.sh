@@ -51,48 +51,56 @@ log_info ""
 log_info "Check 1/$TOTAL_CHECKS: MCP Configuration"
 log_info "----------------------------------------"
 
+# Check 1 uses cascading gates: each sub-check depends on the previous passing.
+# The entire check counts as a single pass/fail toward TOTAL_CHECKS.
+CHECK1_PASSED=true
+
 # Check 1.1: Claude Desktop config exists
 if [[ ! -f "$CLAUDE_CONFIG" ]]; then
-    log_error "Claude Desktop config not found: $CLAUDE_CONFIG"
-    FAILED_CHECKS=$((FAILED_CHECKS + 1))
+    log_warn "Claude Desktop config not found: $CLAUDE_CONFIG"
+    CHECK1_PASSED=false
 else
     log_success "  ✓ Claude Desktop config exists"
-fi
 
-# Check 1.2: Validate JSON syntax
-if ! validate_json "$CLAUDE_CONFIG"; then
-    log_error "Claude Desktop config has invalid JSON syntax"
-    FAILED_CHECKS=$((FAILED_CHECKS + 1))
-else
-    log_success "  ✓ Config JSON is valid"
-fi
-
-# Check 1.3: Check vast-rag entry exists
-if ! jq -e '.mcpServers["vast-rag"]' "$CLAUDE_CONFIG" >/dev/null 2>&1; then
-    log_error "vast-rag entry not found in mcpServers"
-    FAILED_CHECKS=$((FAILED_CHECKS + 1))
-else
-    log_success "  ✓ vast-rag entry exists in mcpServers"
-
-    # Check 1.4: Extract and display MCP command path
-    MCP_COMMAND=$(jq -r '.mcpServers["vast-rag"].command' "$CLAUDE_CONFIG")
-    log_info "  → MCP command: $MCP_COMMAND"
-
-    # Check 1.5: Verify command exists
-    if [[ ! -f "$MCP_COMMAND" ]]; then
-        log_warn "  ⚠ Python binary not found: $MCP_COMMAND"
-        FAILED_CHECKS=$((FAILED_CHECKS + 1))
+    # Check 1.2: Validate JSON syntax (only if file exists)
+    if ! python3 -c "import sys, json; json.load(open(sys.argv[1]))" "$CLAUDE_CONFIG" 2>/dev/null; then
+        log_warn "Claude Desktop config has invalid JSON syntax"
+        CHECK1_PASSED=false
     else
-        log_success "  ✓ Python binary exists"
+        log_success "  ✓ Config JSON is valid"
+
+        # Check 1.3: Check vast-rag entry exists (only if JSON is valid)
+        if ! jq -e '.mcpServers["vast-rag"]' "$CLAUDE_CONFIG" >/dev/null 2>&1; then
+            log_warn "vast-rag entry not found in mcpServers"
+            CHECK1_PASSED=false
+        else
+            log_success "  ✓ vast-rag entry exists in mcpServers"
+
+            # Check 1.4: Extract and display MCP command path
+            MCP_COMMAND=$(jq -r '.mcpServers["vast-rag"].command' "$CLAUDE_CONFIG")
+            log_info "  → MCP command: $MCP_COMMAND"
+
+            # Check 1.5: Verify command exists
+            if [[ ! -f "$MCP_COMMAND" ]]; then
+                log_warn "  ⚠ Python binary not found: $MCP_COMMAND"
+                CHECK1_PASSED=false
+            else
+                log_success "  ✓ Python binary exists"
+            fi
+
+            # Check 1.6: Verify environment variables are set
+            RAG_DOCS_ENV=$(jq -r '.mcpServers["vast-rag"].env.RAG_DOCS_PATH' "$CLAUDE_CONFIG")
+            RAG_DATA_ENV=$(jq -r '.mcpServers["vast-rag"].env.RAG_DATA_PATH' "$CLAUDE_CONFIG")
+            log_info "  → RAG_DOCS_PATH: $RAG_DOCS_ENV"
+            log_info "  → RAG_DATA_PATH: $RAG_DATA_ENV"
+        fi
     fi
+fi
 
-    # Check 1.6: Verify environment variables are set
-    RAG_DOCS_ENV=$(jq -r '.mcpServers["vast-rag"].env.RAG_DOCS_PATH' "$CLAUDE_CONFIG")
-    RAG_DATA_ENV=$(jq -r '.mcpServers["vast-rag"].env.RAG_DATA_PATH' "$CLAUDE_CONFIG")
-    log_info "  → RAG_DOCS_PATH: $RAG_DOCS_ENV"
-    log_info "  → RAG_DATA_PATH: $RAG_DATA_ENV"
-
+if [[ "$CHECK1_PASSED" == true ]]; then
     PASSED_CHECKS=$((PASSED_CHECKS + 1))
+else
+    FAILED_CHECKS=$((FAILED_CHECKS + 1))
 fi
 
 # ============================================================================
@@ -105,7 +113,7 @@ log_info "----------------------------------------"
 
 # Activate virtual environment
 if [[ ! -d "$VENV_PATH" ]]; then
-    log_error "Virtual environment not found: $VENV_PATH"
+    log_warn "Virtual environment not found: $VENV_PATH"
     FAILED_CHECKS=$((FAILED_CHECKS + 1))
 else
     # Test import vast_rag
@@ -216,7 +224,7 @@ if "$VENV_PATH/bin/python" -c "$CHROMADB_TEST" 2>&1; then
     log_success "  ✓ ChromaDB initialized, collection created/deleted successfully"
 
     # Count existing collections in production database
-    if [[ -d "$RAG_DATA_PATH/chromadb" ]]; then
+    if [[ -d "$RAG_DATA_PATH/chroma" ]]; then
         COLLECTION_COUNT=$(cat <<'PYTHON'
 import sys
 import os
@@ -225,7 +233,7 @@ try:
     from chromadb.config import Settings
 
     rag_data_path = os.environ.get('RAG_DATA_PATH')
-    chroma_path = os.path.join(rag_data_path, 'chromadb')
+    chroma_path = os.path.join(rag_data_path, 'chroma')
 
     if os.path.exists(chroma_path):
         client = chromadb.PersistentClient(
@@ -261,6 +269,9 @@ log_info "Check 5/$TOTAL_CHECKS: Smoke Test (End-to-End)"
 log_info "----------------------------------------"
 
 # Test end-to-end document processing
+# TODO: Confirm import paths once vast_rag implementation is complete.
+# Current paths (vast_rag.parsing, vast_rag.chunking) may need to change
+# to match the actual module structure.
 SMOKE_TEST=$(cat <<'PYTHON'
 import sys
 import tempfile
@@ -362,7 +373,7 @@ log_info "=========================================="
 
 # Count indexed documents
 INDEXED_DOCS=0
-if [[ -d "$RAG_DATA_PATH/chromadb" ]]; then
+if [[ -d "$RAG_DATA_PATH/chroma" ]]; then
     INDEXED_DOCS=$(cat <<'PYTHON'
 import sys
 import os
@@ -371,7 +382,7 @@ try:
     from chromadb.config import Settings
 
     rag_data_path = os.environ.get('RAG_DATA_PATH')
-    chroma_path = os.path.join(rag_data_path, 'chromadb')
+    chroma_path = os.path.join(rag_data_path, 'chroma')
 
     if os.path.exists(chroma_path):
         client = chromadb.PersistentClient(
@@ -400,7 +411,7 @@ fi
 # Calculate storage size
 STORAGE_SIZE="0 KB"
 if [[ -d "$RAG_DATA_PATH" ]]; then
-    STORAGE_SIZE=$(du -sh "$RAG_DATA_PATH" 2>/dev/null | cut -f1 || echo "0 KB")
+    STORAGE_SIZE=$(du -sh "$RAG_DATA_PATH" 2>/dev/null | awk '{print $1}' || echo "0 KB")
 fi
 
 log_info "Total Checks:    $TOTAL_CHECKS"
@@ -414,13 +425,7 @@ log_info "Data Path:         $RAG_DATA_PATH"
 log_info "Log File:          $VERIFY_LOG"
 log_info ""
 
-log_success "Verification complete!"
-log_info "Next steps:"
-log_info "  1. Restart Claude Desktop to activate MCP server"
-log_info "  2. Add documents to: $RAG_DOCS_PATH"
-log_info "  3. Ask Claude: 'Search vast-rag docs for <topic>'"
-
-# Final status
+# Final status determination
 if [[ $FAILED_CHECKS -eq 0 ]]; then
     if [[ $SKIPPED_CHECKS -eq 0 ]]; then
         log_success "All checks passed! ✓"
@@ -438,8 +443,11 @@ else
     EXIT_CODE=1
 fi
 
-# Write completion marker
-echo "VERIFY_COMPLETE" > /tmp/verify_complete.marker
+log_info ""
+log_info "Next steps:"
+log_info "  1. Restart Claude Desktop to activate MCP server"
+log_info "  2. Add documents to: $RAG_DOCS_PATH"
+log_info "  3. Ask Claude: 'Search vast-rag docs for <topic>'"
 
 # Wait for tee to finish writing to log file
 sleep 0.5
