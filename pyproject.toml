@@ -28,6 +28,9 @@ dev = [
     "reportlab>=4.0.0",
 ]
 
+[project.scripts]
+vast-rag = "vast_rag.server:run"
+
 [build-system]
 requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
