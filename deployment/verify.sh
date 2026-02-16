@@ -268,40 +268,37 @@ log_info ""
 log_info "Check 5/$TOTAL_CHECKS: Smoke Test (End-to-End)"
 log_info "----------------------------------------"
 
-# Test end-to-end document processing
-# TODO: Confirm import paths once vast_rag implementation is complete.
-# Current paths (vast_rag.parsing, vast_rag.chunking) may need to change
-# to match the actual module structure.
+# Test end-to-end document processing: parse → chunk pipeline
 SMOKE_TEST=$(cat <<'PYTHON'
 import sys
 import tempfile
 import os
+from pathlib import Path
 try:
-    # Try to import implementation modules
-    from vast_rag.parsing import ParserFactory
-    from vast_rag.chunking import SemanticChunker
+    from vast_rag.parsers.factory import ParserFactory
+    from vast_rag.core.chunker import SemanticChunker
 
     # Create test document
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-        f.write("This is a test document.\n\n")
-        f.write("It contains multiple paragraphs.\n\n")
-        f.write("Each paragraph should be chunked appropriately.")
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+        f.write("# Test Document\n\n")
+        f.write("This is a test document for the smoke test.\n\n")
+        f.write("## Section One\n\n")
+        f.write("It contains multiple paragraphs to verify chunking.\n")
         test_file = f.name
 
     try:
         # Parse document
-        parser = ParserFactory.get_parser(test_file)
-        content = parser.parse()
+        factory = ParserFactory()
+        doc = factory.parse_document(Path(test_file))
 
         # Chunk content
-        chunker = SemanticChunker(max_chunk_size=512)
-        chunks = chunker.chunk(content)
+        chunker = SemanticChunker(chunk_size=200, chunk_overlap=20)
+        chunks = chunker.chunk_document(doc, category="general-tech")
 
-        print(f"SUCCESS: Parsed and chunked document into {len(chunks)} chunks")
+        print(f"SUCCESS: Parsed and chunked document into {len(chunks)} chunk(s)")
         sys.exit(0)
 
     finally:
-        # Cleanup
         os.unlink(test_file)
 
 except ImportError as e:
