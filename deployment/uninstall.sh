@@ -86,6 +86,23 @@ if [[ "$REMOVE_MCP" == true ]]; then
         rm -f "$VAST_RAG_ROOT/.mcp.json.example"
         log_info "Removed .mcp.json.example"
     fi
+
+    # Remove from Claude Code workspace config
+    if [[ -f "$CLAUDE_CODE_CONFIG" ]]; then
+        if jq -e '.mcpServers["vast-rag"]' "$CLAUDE_CODE_CONFIG" >/dev/null 2>&1; then
+            TMP_CC_CONFIG=$(mktemp)
+            jq 'del(.mcpServers["vast-rag"])' "$CLAUDE_CODE_CONFIG" > "$TMP_CC_CONFIG"
+            if ! (validate_json "$TMP_CC_CONFIG") 2>/dev/null; then
+                log_warn "JSON validation failed for Claude Code config. Skipping removal."
+                rm -f "$TMP_CC_CONFIG"
+            else
+                mv "$TMP_CC_CONFIG" "$CLAUDE_CODE_CONFIG"
+                log_success "vast-rag removed from Claude Code configuration."
+            fi
+        else
+            log_info "vast-rag not found in Claude Code config. Skipping."
+        fi
+    fi
 else
     log_info "Skipping MCP registration removal"
 fi
@@ -144,4 +161,5 @@ fi
 if [[ "$REMOVE_MCP" == true ]]; then
     echo ""
     log_info "Restart Claude Desktop to apply configuration changes."
+    log_info "In Claude Code, run /mcp to verify vast-rag has been removed."
 fi

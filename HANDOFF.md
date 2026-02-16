@@ -58,12 +58,20 @@ Known issues:
 ## Deployment
 
 ```bash
-# One-time setup (registers with Claude Desktop)
+# One-time setup (registers with both Claude Desktop and Claude Code)
 ./deployment/deploy.sh
 
-# After that, Claude Desktop auto-starts the server on launch.
+# After that, the server is available in both:
+#   - Claude Desktop: auto-starts on launch
+#   - Claude Code: visible via /mcp command (enable/disable as needed)
 # Just drop docs into ~/projects/RAG/ and ask Claude about them.
 ```
+
+### Claude Code Configuration
+
+The MCP server is registered in the workspace `.mcp.json` at `~/Development/.mcp.json`.
+Use `/mcp` in Claude Code to enable/disable it. The deployment scripts manage both
+Claude Desktop (`claude_desktop_config.json`) and Claude Code (`.mcp.json`) configs.
 
 ## Deploying on Another Machine
 

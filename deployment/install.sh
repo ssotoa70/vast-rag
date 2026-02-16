@@ -55,6 +55,14 @@ if [[ "$ROLLBACK" == true ]]; then
     # Remove project-local example
     rm -f "$VAST_RAG_ROOT/.mcp.json.example"
 
+    # Remove from Claude Code config
+    if [[ -f "$CLAUDE_CODE_CONFIG" ]] && jq -e '.mcpServers["vast-rag"]' "$CLAUDE_CODE_CONFIG" >/dev/null 2>&1; then
+        TMP_CC_CONFIG=$(mktemp)
+        jq 'del(.mcpServers["vast-rag"])' "$CLAUDE_CODE_CONFIG" > "$TMP_CC_CONFIG"
+        mv "$TMP_CC_CONFIG" "$CLAUDE_CODE_CONFIG"
+        log_info "Removed vast-rag from Claude Code config."
+    fi
+
     log_success "Rollback complete. Restart Claude Desktop to apply changes."
     exit 0
 fi
@@ -193,12 +201,53 @@ EOF
 log_success "Generated .mcp.json.example ✓"
 
 # ============================================================================
+# REGISTER WITH CLAUDE CODE (workspace .mcp.json)
+# ============================================================================
+
+log_info "Registering MCP server with Claude Code..."
+
+if [[ -f "$CLAUDE_CODE_CONFIG" ]]; then
+    # Check if vast-rag already exists
+    if jq -e '.mcpServers["vast-rag"]' "$CLAUDE_CODE_CONFIG" >/dev/null 2>&1; then
+        log_info "vast-rag entry exists in Claude Code config, updating..."
+        TMP_CC_CONFIG=$(mktemp)
+        jq --argjson entry "$MCP_ENTRY" '.mcpServers["vast-rag"] = $entry' "$CLAUDE_CODE_CONFIG" > "$TMP_CC_CONFIG"
+        if (validate_json "$TMP_CC_CONFIG") 2>/dev/null; then
+            mv "$TMP_CC_CONFIG" "$CLAUDE_CODE_CONFIG"
+            log_success "Claude Code configuration updated ✓"
+        else
+            log_warn "Failed to validate Claude Code config. Skipping update."
+            rm -f "$TMP_CC_CONFIG"
+        fi
+    else
+        log_info "Adding vast-rag to Claude Code config..."
+        TMP_CC_CONFIG=$(mktemp)
+        if jq -e '.mcpServers' "$CLAUDE_CODE_CONFIG" >/dev/null 2>&1; then
+            jq --argjson entry "$MCP_ENTRY" '.mcpServers["vast-rag"] = $entry' "$CLAUDE_CODE_CONFIG" > "$TMP_CC_CONFIG"
+        else
+            jq --argjson entry "$MCP_ENTRY" '. + {mcpServers: {"vast-rag": $entry}}' "$CLAUDE_CODE_CONFIG" > "$TMP_CC_CONFIG"
+        fi
+        if (validate_json "$TMP_CC_CONFIG") 2>/dev/null; then
+            mv "$TMP_CC_CONFIG" "$CLAUDE_CODE_CONFIG"
+            log_success "Claude Code configuration updated ✓"
+        else
+            log_warn "Failed to validate Claude Code config. Skipping update."
+            rm -f "$TMP_CC_CONFIG"
+        fi
+    fi
+else
+    log_warn "Claude Code workspace config not found: $CLAUDE_CODE_CONFIG"
+    log_warn "To use with Claude Code, add vast-rag to your workspace .mcp.json manually."
+fi
+
+# ============================================================================
 # COMPLETION
 # ============================================================================
 
 log_success "MCP server installation complete!"
 log_info "Next steps:"
 log_info "  1. Restart Claude Desktop to activate MCP server"
-log_info "  2. Verify installation: ./deployment/verify.sh"
+log_info "  2. In Claude Code, use /mcp to verify vast-rag is available"
+log_info "  3. Verify installation: ./deployment/verify.sh"
 log_info ""
 log_info "To rollback: $0 --rollback"

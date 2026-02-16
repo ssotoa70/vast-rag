@@ -21,8 +21,11 @@ VAST_RAG_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Python virtual environment path
 VENV_PATH="${VAST_RAG_ROOT}/.venv"
 
-# Claude configuration file path
+# Claude Desktop configuration file path
 CLAUDE_CONFIG="${HOME}/Library/Application Support/Claude/claude_desktop_config.json"
+
+# Claude Code workspace configuration file path (.mcp.json in workspace root)
+CLAUDE_CODE_CONFIG="${VAST_RAG_ROOT}/../.mcp.json"
 
 # RAG documentation path (can be overridden via environment variable)
 RAG_DOCS_PATH="${RAG_DOCS_PATH:-$HOME/projects/RAG}"
@@ -31,7 +34,7 @@ RAG_DOCS_PATH="${RAG_DOCS_PATH:-$HOME/projects/RAG}"
 RAG_DATA_PATH="${RAG_DATA_PATH:-$HOME/.claude/rag-data}"
 
 # Export paths for use in subshells
-export VAST_RAG_ROOT VENV_PATH CLAUDE_CONFIG RAG_DOCS_PATH RAG_DATA_PATH
+export VAST_RAG_ROOT VENV_PATH CLAUDE_CONFIG CLAUDE_CODE_CONFIG RAG_DOCS_PATH RAG_DATA_PATH
 
 # ============================================================================
 # COLOR CODES FOR TERMINAL OUTPUT
