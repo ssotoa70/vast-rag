@@ -331,7 +331,7 @@ vast-rag/
 
 ### Core Modules Explained
 
-**server.py** — Production entry point. Starts the MCP server and listens for messages over stdio. This is the executable that Claude Desktop runs.
+**server.py** — Production entry point. Starts the MCP server over stdio with deferred initialization: the MCP handshake completes immediately while document indexing runs in a background task. Includes workarounds for macOS 26+ xzone malloc crashes in native extensions (OpenMP, tokenizers).
 
 **indexer.py** — Orchestration layer that coordinates all indexing components. The DocumentIndexer class manages the end-to-end pipeline: watching for file changes, parsing documents, chunking, embedding, and storing in ChromaDB.
 
@@ -362,7 +362,7 @@ VAST RAG is configured through a combination of environment variables and config
 Set these in your shell, `.env` file, or through Claude Desktop's configuration:
 
 | Variable | Default | Purpose |
-|----------|---------|---------|
+|----------|---------|--------|
 | `RAG_DOCS_PATH` | `~/projects/RAG` | Source directory where documents are located |
 | `RAG_DATA_PATH` | `~/.claude/rag-data` | Directory for ChromaDB, logs, and cached models |
 | `RAG_CHUNK_SIZE` | `500` | Target tokens per chunk |
@@ -495,6 +495,12 @@ To deploy VAST RAG on a different macOS machine:
 **Issue: Claude Desktop doesn't see the new tool**
 - Solution: Completely restart Claude Desktop (not just closing the window). Use Cmd+Q to quit, then reopen.
 
+**Issue: MCP server times out during initialization (error -32001)**
+- Solution: This was fixed in v0.1.1 — the server now defers document indexing to a background task after the MCP handshake completes. If you see this error, ensure you have the latest version.
+
+**Issue: Python crash on exit (EXC_BREAKPOINT on macOS 26+)**
+- Solution: This is a known macOS 26 xzone malloc issue with OpenMP/tokenizers native code. The server includes automatic workarounds (`MallocNanoZone=0`, `os._exit()`). The crash only occurs during exit and does not affect functionality.
+
 **Issue: "Permission denied" on deployment script**
 - Solution: Make the script executable: `chmod +x deployment/deploy.sh`
 
@@ -565,6 +571,8 @@ pytest tests/ -vv -s
 
 **Python 3.13 Incompatibility**: The embeddings library and torch have memory allocation issues with Python 3.13. Use Python 3.12. The deployment script enforces this requirement.
 
+**macOS 26 (Tahoe) Exit Crash**: On macOS 26+, the xzone malloc allocator detects heap corruption in OpenMP/tokenizers native code during process exit (`__kmp_internal_end_library` → `_xzm_xzone_malloc_freelist_outlined`). The server handles this via three mitigations: `MallocNanoZone=0` (legacy allocator), `OMP_NUM_THREADS=1` + `TOKENIZERS_PARALLELISM=false` (reduced native parallelism), and `os._exit()` to skip C++ atexit handlers. This is a crash-on-exit only — it does not affect functionality during operation.
+
 **Large Document Processing**: Documents larger than 1GB may cause memory issues during parsing. Split very large archives into multiple files.
 
 **Special Characters in Filenames**: Documents with certain Unicode characters in filenames may not index correctly. Use ASCII or common Unicode characters for filenames.
@@ -575,7 +583,7 @@ pytest tests/ -vv -s
 
 ### System Requirements
 
-- **macOS 15.2+** (tested on Sonoma and Sequoia)
+- **macOS 15.2+** (tested on Sonoma, Sequoia, and Tahoe/macOS 26)
 - **Python 3.12.x** (3.13 not supported due to torch malloc issues)
 - **Claude Desktop** version 1.0+
 - **Disk Space**: ~500MB for the embedding model + space for ChromaDB (typically 100-500MB depending on document count)

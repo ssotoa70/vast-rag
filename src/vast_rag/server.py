@@ -7,19 +7,32 @@ server that communicates over stdio. It's the target of:
 Lifecycle:
     1. Load config from environment variables
     2. Initialize DocumentIndexer (creates ChromaDB, hash index)
-    3. Index any new/changed docs in the docs directory
-    4. Start the file watcher for live updates
-    5. Register MCP tools and serve over stdio
+    3. Start MCP stdio transport (handshake first)
+    4. Index docs and start file watcher in background
+    5. Serve tool calls until shutdown
     6. On shutdown, stop the watcher gracefully
 """
 import asyncio
 import json
 import logging
 import logging.handlers
+import os
 import signal
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Work around macOS 26+ xzone malloc crash during OpenMP cleanup.
+# The new xzone allocator detects use-after-free in OpenMP/tokenizers
+# native code during atexit, causing EXC_BREAKPOINT.  Disabling nano
+# zones falls back to the legacy allocator which tolerates it.
+# Also limit OpenMP threads — sentence-transformers doesn't benefit
+# from parallel OMP when we already batch in Python.
+# ---------------------------------------------------------------------------
+os.environ.setdefault("MallocNanoZone", "0")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -238,6 +251,39 @@ def _handle_get_document(indexer: DocumentIndexer, args: dict) -> list[types.Tex
 # Main entry point
 # ---------------------------------------------------------------------------
 
+async def _deferred_indexing(indexer: DocumentIndexer, config: Config) -> None:
+    """Run initial indexing and start file watcher in the background.
+
+    This runs after the MCP transport is established so the server can
+    complete the protocol handshake without timing out.  The heavy work
+    (model loading + embedding) is offloaded to a thread so it doesn't
+    block the async event loop.
+    """
+    try:
+        if config.docs_path.exists():
+            logger.info("Running deferred document indexing...")
+            loop = asyncio.get_running_loop()
+            stats = await loop.run_in_executor(None, indexer.index_directory)
+            logger.info(
+                f"Initial indexing: {stats['indexed']} indexed, "
+                f"{stats['skipped']} skipped, {stats['errors']} errors"
+            )
+        else:
+            logger.warning(f"Docs path does not exist: {config.docs_path}")
+
+        # Start file watcher
+        try:
+            indexer.start_watching()
+            logger.info("File watcher started")
+        except Exception as e:
+            logger.warning(f"Could not start file watcher: {e}")
+
+    except asyncio.CancelledError:
+        logger.info("Deferred indexing cancelled")
+    except Exception:
+        logger.error("Deferred indexing failed", exc_info=True)
+
+
 async def main() -> None:
     """Run the VAST RAG MCP server."""
     config = get_config()
@@ -249,47 +295,54 @@ async def main() -> None:
 
     app, indexer = create_server(config)
 
-    # Initial indexing pass
-    if config.docs_path.exists():
-        logger.info("Running initial document indexing...")
-        stats = indexer.index_directory()
-        logger.info(
-            f"Initial indexing: {stats['indexed']} indexed, "
-            f"{stats['skipped']} skipped, {stats['errors']} errors"
-        )
-    else:
-        logger.warning(f"Docs path does not exist: {config.docs_path}")
-
-    # Start file watcher
-    try:
-        indexer.start_watching()
-        logger.info("File watcher started")
-    except Exception as e:
-        logger.warning(f"Could not start file watcher: {e}")
-
-    # Serve over stdio
+    # Serve over stdio — start listening FIRST so the MCP handshake
+    # completes before heavy indexing work begins.
+    indexing_task: asyncio.Task | None = None
     try:
         async with stdio_server() as (read_stream, write_stream):
             logger.info("MCP server listening on stdio")
+
+            # Schedule indexing as a background task now that the
+            # transport is ready and the handshake can proceed.
+            indexing_task = asyncio.create_task(
+                _deferred_indexing(indexer, config)
+            )
+
             await app.run(
                 read_stream,
                 write_stream,
                 app.create_initialization_options(),
             )
     finally:
+        if indexing_task and not indexing_task.done():
+            indexing_task.cancel()
+            try:
+                await indexing_task
+            except asyncio.CancelledError:
+                pass
         indexer.stop_watching()
         logger.info("VAST RAG MCP server stopped")
 
 
 def run() -> None:
     """Synchronous wrapper for main(), used as script entry point."""
+    exit_code = 0
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("Interrupted by user")
     except Exception:
         logger.error("Fatal error", exc_info=True)
-        sys.exit(1)
+        exit_code = 1
+    finally:
+        # Use os._exit() to skip C++ atexit handlers (OpenMP, tokenizers).
+        # On macOS 26+ the xzone malloc allocator detects heap corruption
+        # in __kmp_internal_end_library during normal exit(), causing
+        # EXC_BREAKPOINT.  Since our Python cleanup (watcher stop, log
+        # flush) happens in main()'s finally block, we can safely skip
+        # the C++ layer teardown.
+        logging.shutdown()
+        os._exit(exit_code)
 
 
 if __name__ == "__main__":

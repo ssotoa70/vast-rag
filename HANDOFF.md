@@ -50,10 +50,16 @@ Known issues:
 ## Environment
 
 - **Python:** 3.12.12 (avoid 3.13 — malloc crash-loop in native extensions)
+- **macOS:** Tested on macOS 26 Tahoe (25C56) — includes xzone malloc workarounds
 - **Embedding model:** BAAI/bge-base-en-v1.5 (768-dim)
 - **Vector DB:** ChromaDB with dual collections (vast-data, general-tech)
 - **Docs watched:** ~/projects/RAG/
 - **Data stored:** ~/.claude/rag-data/
+
+## Post-completion Fixes (2026-02-16)
+
+- **MCP initialization timeout fix:** Deferred `index_directory()` to background task after MCP handshake (`asyncio.create_task` + `run_in_executor`). Fixes error `-32001`.
+- **macOS 26 xzone malloc crash fix:** Added `MallocNanoZone=0`, `OMP_NUM_THREADS=1`, `TOKENIZERS_PARALLELISM=false` env vars and `os._exit()` to skip OpenMP atexit handlers that trigger `EXC_BREAKPOINT` during process exit.
 
 ## Deployment
 
