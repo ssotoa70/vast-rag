@@ -1,10 +1,16 @@
 # VAST RAG: Semantic Search for VAST Data Documentation
 
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue?logo=python&logoColor=white)
-![Status: Production Ready](https://img.shields.io/badge/status-production%20ready-green)
-![License: Proprietary](https://img.shields.io/badge/license-proprietary-red)
-![Tests: 97 Passing](https://img.shields.io/badge/tests-97%20passing-brightgreen)
-![MCP Server](https://img.shields.io/badge/MCP%20Server-v1.0-purple)
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
+![Status: Production Ready](https://img.shields.io/badge/status-production%20ready-brightgreen)
+![Tests: 97 Passing](https://img.shields.io/badge/tests-97%20passing-success)
+
+**Tech Stack:**
+![ChromaDB](https://img.shields.io/badge/ChromaDB-vector%20store-FC4500)
+![Sentence Transformers](https://img.shields.io/badge/Sentence%20Transformers-embeddings-4B8BBE)
+![MCP](https://img.shields.io/badge/MCP-1.0-purple)
+![Watchdog](https://img.shields.io/badge/Watchdog-file%20monitoring-orange)
+![PyPDF](https://img.shields.io/badge/PyPDF-PDF%20parsing-FF6B6B)
 
 A production-ready MCP (Model Context Protocol) server that provides fast, local semantic search over VAST Data technical documentation using ChromaDB and sentence-transformers. This system enables Claude and other AI tools to access your complete documentation repository with natural language queries, all without any external API calls.
 
