@@ -5,7 +5,7 @@ Automated deployment and configuration scripts for the VAST RAG MCP server.
 ## Quick Start
 
 ```bash
-cd /Users/sergio.soto/Development/vast-rag
+cd ~/Development/vast-rag
 ./deployment/deploy.sh
 ```
 
@@ -16,7 +16,7 @@ This runs setup, install, and verify in sequence.
 ### Full Deployment
 
 ```bash
-cd /Users/sergio.soto/Development/vast-rag
+cd ~/Development/vast-rag
 ./deployment/deploy.sh
 ```
 
@@ -122,8 +122,8 @@ This is expected if implementation is incomplete. Run verify again when the impl
 Override defaults by setting environment variables before running scripts:
 
 ```bash
-RAG_DOCS_PATH=/Users/sergio.soto/projects/RAG
-RAG_DATA_PATH=/Users/sergio.soto/.claude/rag-data
+RAG_DOCS_PATH=~/projects/RAG
+RAG_DATA_PATH=~/.claude/rag-data
 ```
 
 ### Advanced Configuration (config.yaml)

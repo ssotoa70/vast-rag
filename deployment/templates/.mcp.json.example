@@ -1,14 +1,14 @@
 {
   "mcpServers": {
     "vast-rag": {
-      "command": "/Users/sergio.soto/Development/vast-rag/.venv/bin/python",
+      "command": "~/Development/vast-rag/.venv/bin/python",
       "args": [
         "-m",
         "vast_rag.server"
       ],
       "env": {
-        "RAG_DOCS_PATH": "/Users/sergio.soto/projects/RAG",
-        "RAG_DATA_PATH": "/Users/sergio.soto/.claude/rag-data"
+        "RAG_DOCS_PATH": "~/projects/RAG",
+        "RAG_DATA_PATH": "~/.claude/rag-data"
       }
     }
   }
