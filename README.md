@@ -1,4 +1,4 @@
-# VAST RAG: Semantic Search for VAST Data Documentation
+# Local RAG: Semantic Search for VAST Data Documentation
 
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue?logo=python&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
@@ -12,11 +12,11 @@
 ![Watchdog](https://img.shields.io/badge/Watchdog-file%20monitoring-orange)
 ![PyPDF](https://img.shields.io/badge/PyPDF-PDF%20parsing-FF6B6B)
 
-A production-ready MCP (Model Context Protocol) server that provides fast, local semantic search over VAST Data technical documentation using ChromaDB and sentence-transformers. This system enables Claude and other AI tools to access your complete documentation repository with natural language queries, all without any external API calls.
+A production-ready MCP (Model Context Protocol) server that provides fast, local semantic search over technical documentation using ChromaDB and sentence-transformers. This system enables Claude and other AI tools to access your complete documentation repository with natural language queries, all without any external API calls.
 
-## What is VAST RAG?
+## What is Local RAG?
 
-VAST RAG combines **Retrieval-Augmented Generation (RAG)** with the **Model Context Protocol (MCP)** to create a local, self-contained semantic search system. Unlike traditional keyword-based search, VAST RAG understands the semantic meaning of your queries and documents, finding relevant information even when exact keywords don't match.
+Local RAG combines **Retrieval-Augmented Generation (RAG)** with the **Model Context Protocol (MCP)** to create a local, self-contained semantic search system. Unlike traditional keyword-based search, Local RAG understands the semantic meaning of your queries and documents, finding relevant information even when exact keywords don't match.
 
 ### Why Local RAG Matters
 
@@ -115,7 +115,7 @@ The file watcher tracks all file system events and filters for supported documen
 
 #### 2. Parser Factory and Format-Specific Parsers
 
-When a file is detected, the parser factory examines its extension and content to determine the appropriate parser. VAST RAG includes specialized parsers for each supported format:
+When a file is detected, the parser factory examines its extension and content to determine the appropriate parser. Local RAG includes specialized parsers for each supported format:
 
 - **PDFParser**: Extracts text using PyPDF2 with pdfplumber as a fallback. Preserves page numbers for citation purposes.
 - **MarkdownParser**: Extracts sections and hierarchy from Markdown files, preserving structure metadata.
@@ -137,7 +137,7 @@ This approach balances two competing needs: chunks must be small enough to be se
 
 #### 4. Hash Index and Idempotent Indexing
 
-To avoid re-embedding the entire document collection on every run, VAST RAG maintains a SHA-256 hash index of all processed files. Before processing a document, the system compares the current file's hash against the stored hash. If they match, the file is skipped; if they differ, the file is re-parsed and re-embedded.
+To avoid re-embedding the entire document collection on every run, Local RAG maintains a SHA-256 hash index of all processed files. Before processing a document, the system compares the current file's hash against the stored hash. If they match, the file is skipped; if they differ, the file is re-parsed and re-embedded.
 
 This makes indexing idempotent and efficient—re-running the indexer only processes changed files.
 
@@ -155,12 +155,12 @@ Key design choices:
 
 Embeddings are stored in a ChromaDB vector database with a deliberate dual-collection design:
 
-- **vast-data collection**: Contains all documents related to VAST products (VastDB, VAST Data Engine, InsightEngine). Documents are automatically categorized based on file paths—any document with "vast" in the path is placed in this collection.
+- **vast-data collection**: Contains all documents related to specific knowledge domains. Documents are automatically categorized based on file paths—any document with "vast" in the path is placed in this collection.
 - **general-tech collection**: Contains all other technical documentation (architecture notes, design documents, external references, etc.).
 
 This dual design provides these benefits:
 
-- **Flexible scoping**: Users can search all documentation or narrow results to VAST-specific content only.
+- **Flexible scoping**: Users can search all documentation or narrow results to Domain-specific content only.
 - **Improved relevance**: Keeping related documents together reduces semantic drift in search results.
 - **Future extensibility**: The design easily accommodates additional specialized collections.
 
@@ -195,7 +195,7 @@ All system activity is logged to `~/.claude/rag-data/logs/vast-rag.log`. The log
 
 ## MCP Tools
 
-The VAST RAG MCP server exposes three core tools that Claude and other MCP clients can invoke:
+The Local RAG MCP server exposes three core tools that Claude and other MCP clients can invoke:
 
 ### search_docs
 
